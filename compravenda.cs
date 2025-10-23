@@ -15,8 +15,7 @@ using static AnaliseAcoes.Form1;
 namespace AnaliseAcoes
 {
     public partial class FormCompraVenda : Form
-    {
-        
+    {       
 
         private ComboBox cmbAtivo;
         private TextBox txtQuantidade;
@@ -28,16 +27,20 @@ namespace AnaliseAcoes
         private string ativoSelecionado;
         private decimal saldoAtual;
         private TipoOperacao tipoOperacao;
+        private NumericUpDown autoLossPercentage;
+        private NumericUpDown autoAlvoPercent;
 
         public FormCompraVenda(TipoOperacao operacao, List<string> tickers, string ativoSelecionado)
+        //public FormCompraVenda(TipoOperacao operacao, List<string> tickers = {"BBAS3", "PETR4" }, string ativoSelecionado = "BBAS3")
         {
             InitializeComponent();
             this.Text = operacao == TipoOperacao.Compra ? "Registrar Compra" : "Registrar Venda";
             tipoOperacao = operacao;
-            this.Size = new Size(305, 290);
+            this.Size = new Size(355, 320); // -30 valor anterior
             this.StartPosition = FormStartPosition.CenterScreen;
             this.tickers = tickers;
             this.ativoSelecionado = ativoSelecionado;
+            this.BackColor = Form1.BACKGROUND;
             IniciaFormulario(this, EventArgs.Empty);
         }
 
@@ -59,6 +62,7 @@ namespace AnaliseAcoes
             for (int i = 0; i < lblNomes.Length; i++)
             {
                 Label lbl = CriarLabel(lblNomes[i] + ":", 20 + i * 30);
+                lbl.ForeColor = Form1.CORFORE;
                 pnLabels.Controls.Add(lbl);
             }
 
@@ -73,7 +77,8 @@ namespace AnaliseAcoes
             // Campos de entrada correspondentes às labels
             for (int i = 0; i < lblNomes.Length; i++)
             {
-                switch(i){
+                switch (i)
+                {
                     case 0:
                         cmbAtivo = new ComboBox()
                         {
@@ -119,26 +124,95 @@ namespace AnaliseAcoes
                         };
                         pnEntradas.Controls.Add(txtAlvo);
                         break;
-                }   
+                }
+            }
 
-                Panel pnBotoes = new Panel
-                {
-                    Location = new Point(10, 190),
-                    Size = new Size(270, 50),
-                    BorderStyle = BorderStyle.FixedSingle
-                };
-                this.Controls.Add(pnBotoes);
+            Panel pnBotoes = new Panel
+            {
+                Location = new Point(10, 190),
+                Size = new Size(320, 80),
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            this.Controls.Add(pnBotoes);
 
-                btnSalvar = new Button()
-                {
-                    Text = "Salvar",
-                    Location = new Point(10, 10),
-                    Size = new Size(80, 30)
-                };
-                btnSalvar.Click += (s, e) => { BtnSalvar_Click(); this.DialogResult = DialogResult.OK;
-                    this.Close();
-                };
-                pnBotoes.Controls.Add(btnSalvar);
+            btnSalvar = Form1.CriarBotao("Salvar");            
+            btnSalvar.Location = new Point(10, 10);
+            btnSalvar.Size = new Size(80, 30);
+            btnSalvar.Click += (s, e) => { BtnSalvar_Click(); this.DialogResult = DialogResult.OK;
+                this.Close();
+            };
+            pnBotoes.Controls.Add(btnSalvar);
+
+            CheckBox chkCalculaStopLoss = new CheckBox()
+            {
+                Text = "StopLoss Automático",
+                ForeColor = Form1.CORFORE,
+                Location = new Point(100, 10),
+                AutoSize = true
+            };
+            chkCalculaStopLoss.CheckedChanged += ChkCalculaStopLoss_CheckedChanged;
+            pnBotoes.Controls.Add(chkCalculaStopLoss);
+            decimal Incremento = 0.01M;
+            autoLossPercentage = new NumericUpDown()
+            {
+                Location = new Point(250, 10),
+                Size = new Size(60, 20),
+                Minimum = 1.00M,
+                Maximum = 5.00M,
+                Value = 1.00M,
+                DecimalPlaces = 2,
+                Increment = Incremento,
+
+            };
+            autoLossPercentage.Enabled = false;
+            pnBotoes.Controls.Add(autoLossPercentage);
+
+            CheckBox chkCalculaAlvo = new CheckBox()
+            {
+                Text = "Alvo Automático",
+                ForeColor = Form1.CORFORE,
+                Location = new Point(100, 40),
+                AutoSize = true,
+                Height = 30,
+            };
+            chkCalculaAlvo.CheckedChanged += ChkCalculaAlvo_CheckedChanged;
+            pnBotoes.Controls.Add(chkCalculaAlvo);
+            autoAlvoPercent = new NumericUpDown()
+            {
+                Location = new Point(250, 35),
+                Size = new Size(60, 20),
+                Minimum = 1,
+                Maximum = 10,
+                Value = 2,
+                DecimalPlaces = 2,
+                Increment = Incremento,
+            };
+            autoAlvoPercent.Enabled = false;
+            pnBotoes.Controls.Add(autoAlvoPercent);
+
+
+
+        }
+        // Desabilita txtbox stoploss se checkbox estiver marcado
+        private void ChkCalculaStopLoss_CheckedChanged(object sender, EventArgs e)
+        {
+            CheckBox chk = sender as CheckBox;
+            if (chk != null)
+            {
+                txtStopLoss.Enabled = !chk.Checked;  
+                autoLossPercentage.Enabled = chk.Checked;
+            }
+            
+
+        }
+        // Desabilita txtbox alvo se checkbox estiver marcado
+        private void ChkCalculaAlvo_CheckedChanged(object sender, EventArgs e)
+        {
+            CheckBox chk = sender as CheckBox;
+            if (chk != null)
+            {
+                txtAlvo.Enabled = !chk.Checked;
+                autoAlvoPercent.Enabled = chk.Checked;
             }
         }
         // Salva o ativo no json
