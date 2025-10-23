@@ -27,7 +27,12 @@ namespace AnaliseAcoes
         WFColor CORHEADERSBACK = WFColor.FromArgb(70, 70, 70);
         WFColor CORFORE = WFColor.White;
 
-
+        public enum TipoOperacao
+        {
+            Compra,
+            Venda
+        }
+        
         private ComboBox cmbCodigo;
         private Button btnBuscar;
         private Button btnAtualizar, btnAdicionar, btnAtualizarPreco, btnRemover;
@@ -36,7 +41,10 @@ namespace AnaliseAcoes
         private DataGridView grid;
 
         private List<AcaoInfo> acoes = new List<AcaoInfo>();
-        private readonly string caminhoArquivo = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "dados", "acoes.json");
+        private List<string> tickersFiltrados = new();
+        private readonly string caminhoArquivo = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "dados", "acoes.json");        
+
+        
 
         public Form1()
         {
@@ -46,8 +54,9 @@ namespace AnaliseAcoes
             this.Width = 1910;
             this.Height = 1000;
 
-            InicializarCompraEVenda();
+            InicializarCompraEVenda();      
             AtualizarGrid(new BDInfoGrid());
+
             CarregarDadosDoArquivo();
             AtualizarStatusLabels(new BDInfoGrid { Acoes = acoes });
             CarregarSaldo();
@@ -56,7 +65,7 @@ namespace AnaliseAcoes
             banco.CriarTabela();
 
             // Popula o ComboBox ao iniciar
-            CarregarTickers();
+            CarregarTickers();            
         }
 
         // ========================================
@@ -96,7 +105,7 @@ namespace AnaliseAcoes
                         if (grid.SelectedRows.Count > 0)
                         {
                             string ticker = grid.SelectedRows[0].Cells["Ticker"].Value.ToString();
-                            AbrirGoogleFinance(ticker);
+                            AbrirGoogleFinance(ticker.Substring(0, 5));
                         }
                         else
                         {
@@ -109,6 +118,36 @@ namespace AnaliseAcoes
                     botao.Click += (s, e) =>
                     {
                         AdicionarSaldo();
+                    };
+                }
+                if (nome == "Comprar")
+                {
+                    botao.Click += (s, e) =>
+                    {
+                        var formCompra = new FormCompraVenda(TipoOperacao.Compra, tickersFiltrados, cmbCodigo.Text);
+                        //formCompra.ShowDialog();
+                        
+                        if (formCompra.ShowDialog() == DialogResult.OK)
+                        {
+                            CarregarDadosDoArquivo();
+                            AtualizarGrid(new BDInfoGrid { Acoes = acoes });
+                            AtualizarStatusLabels(new BDInfoGrid { Acoes = acoes });
+                            CarregarSaldo();
+                        }
+                    };
+                }
+                if (nome == "Vender")
+                {
+                    botao.Click += (s, e) =>
+                    {
+                        var formVenda = new FormCompraVenda(TipoOperacao.Venda, tickersFiltrados, cmbCodigo.Text);
+                        if (formVenda.ShowDialog() == DialogResult.OK)
+                        {
+                            CarregarDadosDoArquivo();
+                            AtualizarGrid(new BDInfoGrid { Acoes = acoes });
+                            AtualizarStatusLabels(new BDInfoGrid { Acoes = acoes });
+                            CarregarSaldo();
+                        }
                     };
                 }
             }
@@ -310,7 +349,7 @@ namespace AnaliseAcoes
         // Abre google finance no navegador
         private void AbrirGoogleFinance(string ticker)
         {
-            MessageBox.Show("Abrindo Google Finance para: " + ticker);
+            //MessageBox.Show("Abrindo Google Finance para: " + ticker);
             string url = $"https://www.google.com/finance/quote/{ticker}:BVMF";
             try
             {
@@ -334,7 +373,7 @@ namespace AnaliseAcoes
             grid.Columns.Add("Quantidade", "Quantidade");
             grid.Columns.Add("PrecoMedio", "Preço Médio");
             grid.Columns.Add("PrecoAtual", "Preço Atual");
-            grid.Columns.Add("ValorAtual", "Valor Atual");
+            grid.Columns.Add("TotalInvestido", "Investido");
             grid.Columns.Add("StopLoss", "Stop Loss");
             grid.Columns.Add("Alvo", "Alvo");
             grid.Columns.Add("Valorizacao", "Valorização");
@@ -363,24 +402,32 @@ namespace AnaliseAcoes
         }
         // Atualizar o grid
         private void AtualizarGrid(BDInfoGrid bdInfo)
-        {
+        {   
+            
             grid.Rows.Clear();
             foreach (var acao in bdInfo.Acoes)
-            {
-                grid.Rows.Add(acao.Ticker, acao.Quantidade, acao.PrecoMedio.ToString("F2"),
-                              acao.PrecoAtual.ToString("F2"), acao.ValorAtual.ToString("F2"),
+            {   acao.TotalInvestido = acao.PrecoMedio * acao.Quantidade;
+                bool estaComprado = acao.Operacao == "C";
+
+                acao.Valorizacao = estaComprado
+                    ? (acao.PrecoAtual - acao.PrecoMedio) / acao.PrecoMedio
+                    : (acao.PrecoMedio - acao.PrecoAtual) / acao.PrecoMedio;
+
+                grid.Rows.Add(acao.Ticker + " (" + acao.Operacao + ")", acao.Quantidade, acao.PrecoMedio.ToString("F2"),
+                              acao.PrecoAtual.ToString("F2"), acao.TotalInvestido.ToString("F2"),
                               acao.StopLoss.ToString("F2"), acao.Alvo.ToString("F2"),
                               acao.Valorizacao.ToString("P2"), acao.Data.ToString("yyyy-MM-dd"));
+                              
             }
         }
 
         // Atualizar status labels
         private void AtualizarStatusLabels(BDInfoGrid bdInfo)
         {
-            
+            decimal valorAtualTotal = bdInfo.Acoes.Sum(a => a.PrecoAtual * a.Quantidade);
             decimal totalInvestido = bdInfo.Acoes.Sum(a => a.PrecoMedio * a.Quantidade);
-            decimal valorAtual = bdInfo.Acoes.Sum(a => a.ValorAtual);
-            decimal ganhoPerda = valorAtual - totalInvestido;
+            decimal ganhoPerda = valorAtualTotal - totalInvestido;
+
             decimal saldo = bdInfo.Saldo;
             if (lblTotalInvestido == null)
             {
@@ -389,8 +436,9 @@ namespace AnaliseAcoes
             }
             lblTotalInvestido.Text = $"Total Investido: {totalInvestido.ToString("C2", new CultureInfo("pt-BR"))}";
             lblGanhoPerda.Text = $"Ganho/Perda: ";
+
             lblGanhoPerdaValor.Text = $"{ganhoPerda.ToString("C2", new CultureInfo("pt-BR"))} " +
-                                      $"({(totalInvestido == 0 ? 0 : ganhoPerda / totalInvestido).ToString("P2", new CultureInfo("pt-BR"))})";
+                          $"({(totalInvestido == 0 ? 0 : ganhoPerda / totalInvestido).ToString("P2", new CultureInfo("pt-BR"))})";
 
             if (ganhoPerda >= 0)
             {
@@ -410,11 +458,12 @@ namespace AnaliseAcoes
             public int Quantidade { get; set; }
             public decimal PrecoMedio { get; set; }
             public decimal PrecoAtual { get; set; }
-            public decimal ValorAtual { get; set; }
+            public decimal TotalInvestido { get; set; }
             public decimal StopLoss { get; set; }
             public decimal Alvo { get; set; }
             public decimal Valorizacao { get; set; }
             public DateTime Data { get; set; }
+            public string Operacao { get; set; }
         }
         // Estrutura do banco de dados para o DataGridView
         private class BDInfoGrid
@@ -487,9 +536,10 @@ namespace AnaliseAcoes
             this.Controls.Add(lblStatus);
             this.Controls.Add(grafico);
         }
-
+        
         private void CarregarTickers()
         {
+
             try
             {
                 cmbCodigo.Items.Clear();
@@ -498,7 +548,7 @@ namespace AnaliseAcoes
 
                 // Expressão regular: 3–4 letras/dígitos + 1–2 números (ex.: B3SA3, PETR4, ITUB11)
                 var regex = new System.Text.RegularExpressions.Regex(@"^[A-Z0-9]{3,4}\d{1}$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                var tickersFiltrados = tickers
+                tickersFiltrados = tickers
                     .Select(t => t.Trim().ToUpper())
                     .Where(t => regex.IsMatch(t))
                     .Distinct()
