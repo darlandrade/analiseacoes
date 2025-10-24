@@ -14,6 +14,7 @@ using YahooFinanceApi;
 
 using WFColor = System.Drawing.Color;
 using WFLabel = System.Windows.Forms.Label;
+using WFFont = System.Drawing.Font;
 using System.Security.Cryptography.X509Certificates;
 
 
@@ -26,13 +27,20 @@ namespace AnaliseAcoes
         WFColor CORHEADERSBACK = WFColor.FromArgb(70, 70, 70);
         public static WFColor CORFORE = WFColor.White;
         public static WFColor BACKGROUND = WFColor.FromArgb(40, 40, 40);
+        public static WFFont FONTEPADRAO(string nome="Consolas", int t = 9)
+        {
+            return new Font(nome, t);
+
+        }
 
         public enum TipoOperacao
         {
             Compra,
             Venda
         }
-        
+
+        private Panel pnBotoes;
+
         private ComboBox cmbCodigo;
         private Button btnBuscar;
         private Button btnAtualizar, btnAdicionar, btnAtualizarPreco, btnRemover;
@@ -84,7 +92,7 @@ namespace AnaliseAcoes
             this.Controls.Add(pnCompraVenda);
 
             // Painel para botões
-            Panel pnBotoes = new Panel
+            pnBotoes = new Panel
             {
                 BorderStyle = BorderStyle.FixedSingle,
                 Location = new Point(10, 5),
@@ -92,68 +100,7 @@ namespace AnaliseAcoes
             };
             pnCompraVenda.Controls.Add(pnBotoes);
 
-            string[] btnNomes = { "Comprar", "Vender", "Atualizar Preços", "Add Saldo", "Google Finance" };
-            foreach (var nome in btnNomes)
-            {
-                Button botao = CriarBotao(nome);
-                botao.Location = new Point(pnBotoes.Controls.Count * (botao.Width + 10) + 10, 10);
-
-                pnBotoes.Controls.Add(botao);
-
-                // click event para abrir google finance
-                if (nome == "Google Finance")
-                {
-                    botao.Click += (s, e) =>
-                    {
-                        if (grid.SelectedRows.Count > 0)
-                        {
-                            string ticker = grid.SelectedRows[0].Cells["Ticker"].Value.ToString();
-                            AbrirGoogleFinance(ticker.Substring(0, 5));
-                        }
-                        else
-                        {
-                            MessageBox.Show("Selecione uma ação no grid para abrir no Google Finance.");
-                        }
-                    };
-                }
-                if (nome == "Add Saldo")
-                {
-                    botao.Click += (s, e) =>
-                    {
-                        AdicionarSaldo();
-                    };
-                }
-                if (nome == "Comprar")
-                {
-                    botao.Click += (s, e) =>
-                    {
-                        var formCompra = new FormCompraVenda(TipoOperacao.Compra, tickersFiltrados, cmbCodigo.Text);
-                        //formCompra.ShowDialog();
-                        
-                        if (formCompra.ShowDialog() == DialogResult.OK)
-                        {
-                            CarregarDadosDoArquivo();
-                            AtualizarGrid(new BDInfoGrid { Acoes = acoes });
-                            AtualizarStatusLabels(new BDInfoGrid { Acoes = acoes });
-                            CarregarSaldo();
-                        }
-                    };
-                }
-                if (nome == "Vender")
-                {
-                    botao.Click += (s, e) =>
-                    {
-                        var formVenda = new FormCompraVenda(TipoOperacao.Venda, tickersFiltrados, cmbCodigo.Text);
-                        if (formVenda.ShowDialog() == DialogResult.OK)
-                        {
-                            CarregarDadosDoArquivo();
-                            AtualizarGrid(new BDInfoGrid { Acoes = acoes });
-                            AtualizarStatusLabels(new BDInfoGrid { Acoes = acoes });
-                            CarregarSaldo();
-                        }
-                    };
-                }
-            }
+            CriarBotoesPainel();
 
             // Painel para labels de status
             FlowLayoutPanel pnStatus = new FlowLayoutPanel
@@ -208,17 +155,17 @@ namespace AnaliseAcoes
                 {
                     BackColor = CORHEADERSBACK,
                     ForeColor = CORFORE,
-                    Font = new System.Drawing.Font("Consolas", 9),
+                    Font = FONTEPADRAO(),
                     SelectionBackColor = CORHEADERSBACK,
                     SelectionForeColor = CORFORE,
-                    Alignment = DataGridViewContentAlignment.MiddleCenter
+                    Alignment = DataGridViewContentAlignment.MiddleCenter,                                        
                 }, // Estilo do cabeçalho
 
                 DefaultCellStyle = new DataGridViewCellStyle
                 {
                     BackColor = WFColor.FromArgb(50, 50, 50),
                     ForeColor = WFColor.LightGray,
-                    Font = new System.Drawing.Font("Consolas", 12 ),
+                    Font = FONTEPADRAO(t:12),
                     SelectionBackColor = OVERSELECTION,
                     SelectionForeColor = CORFORE,
                     Alignment = DataGridViewContentAlignment.MiddleCenter
@@ -242,6 +189,41 @@ namespace AnaliseAcoes
             pnCompraVenda.Controls.Add(grid);
             ConfigurarGrid();
 
+        }
+
+        // Cria os botões com ações associadas
+        private void CriarBotoesPainel()
+        {
+            var acoesBotoes = new Dictionary<string, EventHandler>
+            {
+                ["Comprar"] = (s, e) => ExecutarOperacao(TipoOperacao.Compra),
+                ["Vender"] = (s, e) => ExecutarOperacao(TipoOperacao.Venda),
+                ["Atualizar Preços"] = async (s, e) => await AtualizarValoresAsync(),
+                ["Add Saldo"] = (s, e) => AdicionarSaldo(),
+                ["Google Finance"] = (s, e) => AbrirGoogleFinanceSelecionado()
+            };
+
+            int x = 10;
+            foreach (var (nome, acao) in acoesBotoes)
+            {
+                var botao = CriarBotao(nome);
+                botao.Location = new Point(x, 10);
+                botao.Click += acao;
+
+                pnBotoes.Controls.Add(botao);
+                x += botao.Width + 10;
+            }
+        }
+        private void ExecutarOperacao(TipoOperacao tipo)
+        {
+            var form = new FormCompraVenda(tipo, tickersFiltrados, cmbCodigo.Text);
+            if (form.ShowDialog() == DialogResult.OK)
+            {
+                CarregarDadosDoArquivo();
+                AtualizarGrid(new BDInfoGrid { Acoes = acoes });
+                AtualizarStatusLabels(new BDInfoGrid { Acoes = acoes });
+                CarregarSaldo();
+            }
         }
         // Cria uma nova janela para adicionar saldo
         private void AdicionarSaldo()
@@ -368,6 +350,18 @@ namespace AnaliseAcoes
             }
         }
 
+        private void AbrirGoogleFinanceSelecionado()
+        {
+            if (grid.SelectedRows.Count == 0)
+            {
+                MessageBox.Show("Selecione uma ação no grid para abrir no Google Finance.");
+                return;
+            }
+
+            string ticker = grid.SelectedRows[0].Cells["Ticker"].Value.ToString();
+            AbrirGoogleFinance(ticker.Substring(0, 5));
+        }
+
         // Configuração do grid
         private void ConfigurarGrid()
         {
@@ -405,39 +399,58 @@ namespace AnaliseAcoes
         }
         // Atualizar o grid
         private void AtualizarGrid(BDInfoGrid bdInfo)
-        {   
-            
+        {
             grid.Rows.Clear();
+
             foreach (var acao in bdInfo.Acoes)
-            {   acao.TotalInvestido = acao.PrecoMedio * acao.Quantidade;
+            {
+                acao.TotalInvestido = acao.PrecoMedio * acao.Quantidade;
                 bool estaComprado = acao.Operacao == "C";
 
                 acao.Valorizacao = estaComprado
                     ? (acao.PrecoAtual - acao.PrecoMedio) / acao.PrecoMedio
                     : (acao.PrecoMedio - acao.PrecoAtual) / acao.PrecoMedio;
 
-                grid.Rows.Add(acao.Ticker + " (" + acao.Operacao + ")", acao.Quantidade, acao.PrecoMedio.ToString("F2"),
-                              acao.PrecoAtual.ToString("F2"), acao.TotalInvestido.ToString("F2"),
-                              acao.StopLoss.ToString("F2"), acao.Alvo.ToString("F2"),
-                              acao.Valorizacao.ToString("P2"), acao.Data.ToString("yyyy-MM-dd"));
-                              
+                int idx = grid.Rows.Add(
+                    acao.Ticker + " (" + acao.Operacao + ")",
+                    acao.Quantidade,
+                    acao.PrecoMedio.ToString("F2"),
+                    acao.PrecoAtual.ToString("F2"),
+                    acao.TotalInvestido.ToString("F2"),
+                    acao.StopLoss.ToString("F2"),
+                    acao.Alvo.ToString("F2"),
+                    acao.Valorizacao.ToString("P2"),
+                    acao.Data.ToString("yyyy-MM-dd")
+                );
+
+                var row = grid.Rows[idx];
+
+                // ✅ Lógica de cor
+                if (estaComprado)
+                    if (acao.PrecoAtual > 0 && acao.PrecoAtual <= acao.StopLoss)
+                        row.DefaultCellStyle.BackColor = WFColor.FromArgb(117, 57, 57); // Vermelho escuro
+                    else if (acao.PrecoAtual >= acao.Alvo)
+                        row.DefaultCellStyle.BackColor = WFColor.FromArgb(67, 117, 57); // Verde escuro
+                    else
+                        row.DefaultCellStyle.BackColor = BACKGROUND;
+                else
+                    if (acao.PrecoAtual >= acao.StopLoss)
+                        row.DefaultCellStyle.BackColor = WFColor.FromArgb(117, 57, 57); // Vermelho escuro
+                    else if (acao.PrecoAtual <= acao.Alvo)
+                        row.DefaultCellStyle.BackColor = WFColor.FromArgb(67, 117, 57); // Verde escuro
+                    else
+                        row.DefaultCellStyle.BackColor = BACKGROUND;
+
+                row.DefaultCellStyle.SelectionBackColor = row.DefaultCellStyle.BackColor;
+                row.DefaultCellStyle.SelectionForeColor = row.DefaultCellStyle.ForeColor;
             }
         }
-
-        // Atualizar status labels
-        private void AtualizarStatusLabels(BDInfoGrid bdInfo)
+        private void atualizaGanhoPerda(BDInfoGrid bDInfo)
         {
-            decimal valorAtualTotal = bdInfo.Acoes.Sum(a => a.PrecoAtual * a.Quantidade);
-            decimal totalInvestido = bdInfo.Acoes.Sum(a => a.PrecoMedio * a.Quantidade);
+            decimal valorAtualTotal = bDInfo.Acoes.Sum(a => a.PrecoAtual * a.Quantidade);
+            decimal totalInvestido = bDInfo.Acoes.Sum(a => a.PrecoMedio * a.Quantidade);
             decimal ganhoPerda = valorAtualTotal - totalInvestido;
 
-            decimal saldo = bdInfo.Saldo;
-            if (lblTotalInvestido == null)
-            {
-                MessageBox.Show("lblTotalInvestido está nulo!");
-                return;
-            }
-            lblTotalInvestido.Text = $"Total Investido: {totalInvestido.ToString("C2", new CultureInfo("pt-BR"))}";
             lblGanhoPerda.Text = $"Ganho/Perda: ";
 
             lblGanhoPerdaValor.Text = $"{ganhoPerda.ToString("C2", new CultureInfo("pt-BR"))} " +
@@ -451,7 +464,22 @@ namespace AnaliseAcoes
             {
                 lblGanhoPerdaValor.ForeColor = WFColor.Red;
             }
-            lblSaldo.Text = $"Saldo: {saldo.ToString("C2", new CultureInfo("pt-BR"))}";          
+        }
+        // Atualizar status labels
+        private void AtualizarStatusLabels(BDInfoGrid bdInfo)
+        {
+            decimal totalInvestido = bdInfo.Acoes.Sum(a => a.PrecoMedio * a.Quantidade);
+
+            decimal saldo = bdInfo.Saldo;
+            if (lblTotalInvestido == null)
+            {
+                MessageBox.Show("lblTotalInvestido está nulo!");
+                return;
+            }
+            lblTotalInvestido.Text = $"Total Investido: {totalInvestido.ToString("C2", new CultureInfo("pt-BR"))}";
+            
+            lblSaldo.Text = $"Saldo: {saldo.ToString("C2", new CultureInfo("pt-BR"))}";      
+            atualizaGanhoPerda(bdInfo);
 
         }
         // Campos para pesquisa no JSON
@@ -485,6 +513,7 @@ namespace AnaliseAcoes
                 ForeColor = CORFORE,
                 BackColor = WFColor.FromArgb(70, 70, 70),
                 FlatStyle = FlatStyle.Flat,
+                Font = FONTEPADRAO(t:10),
                 FlatAppearance = { BorderSize = 0, MouseDownBackColor = WFColor.FromArgb(49, 30, 102), MouseOverBackColor = OVERSELECTION }
                 
             };
@@ -497,8 +526,56 @@ namespace AnaliseAcoes
                 Text = texto,
                 AutoSize = true,
                 Margin = new Padding(0, 0, 20, 0),
-                ForeColor = WFColor.LightGray
+                ForeColor = WFColor.LightGray,
+                Font = FONTEPADRAO(t:11)
             };
+        }
+        // ========================================
+        // Atualiza valores das ações via Yahoo Finance
+        // ========================================
+        private async Task AtualizarValoresAsync()
+        {
+            if (acoes == null || acoes.Count == 0)
+            {
+                MessageBox.Show("Nenhum ticker adicionado ainda.");
+                return;
+            }
+
+            try
+            {
+                // Adiciona sufixo .SA se necessário
+                var symbols = acoes.Select(a =>
+                    a.Ticker.EndsWith(".SA") ? a.Ticker : a.Ticker + ".SA"
+                ).ToArray();
+
+                // Consulta os dados no Yahoo
+                var securities = await Yahoo.Symbols(symbols)
+                    .Fields(Field.Symbol, Field.RegularMarketPrice)
+                    .QueryAsync();
+
+                int atualizados = 0;
+
+                foreach (var acao in acoes)
+                {
+                    string tickerBusca = acao.Ticker.EndsWith(".SA") ? acao.Ticker : acao.Ticker + ".SA";
+
+                    if (securities.TryGetValue(tickerBusca, out var data) && data.RegularMarketPrice != null)
+                    {
+                        decimal precoAtual = (decimal)data.RegularMarketPrice;
+                        acao.PrecoAtual = precoAtual;
+                        acao.Valorizacao = ((precoAtual - acao.PrecoMedio) / acao.PrecoMedio) * 100;
+                        atualizados++;
+                    }
+                }
+
+                AtualizarGrid(new BDInfoGrid { Acoes = acoes });
+                atualizaGanhoPerda(new BDInfoGrid { Acoes = acoes});
+                SalvarDados();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erro ao buscar dados: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
         // ========================================
         // Inicializa Gráfico de analise de ações
@@ -576,7 +653,19 @@ namespace AnaliseAcoes
                 lblStatus.Text = "Erro ao carregar tickers: " + ex.Message;
             }
         }
-
+        private void SalvarDados()
+        {
+            try
+            {
+                string json = JsonSerializer.Serialize(acoes, new JsonSerializerOptions { WriteIndented = true });
+                Directory.CreateDirectory(Path.GetDirectoryName(caminhoArquivo)!);
+                File.WriteAllText(caminhoArquivo, json);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erro ao salvar dados: {ex.Message}");
+            }
+        }
         private void BtnAtualizar_Click(object sender, EventArgs e)
         {
             btnAtualizar.Enabled = false;
@@ -822,36 +911,40 @@ namespace AnaliseAcoes
 
 
         }
-        private void Grafico_MouseLeave(object? sender, EventArgs e)
-        {
-            if (lblValorHover != null) lblValorHover.Visible = false;
-        }
-
-
         private void Grafico_MouseMove(object? sender, MouseEventArgs e)
         {
             try
             {
                 if (currentXs == null || currentYs == null || currentXs.Length == 0)
+                {
+                    lblValorHover.Visible = false;
                     return;
+                }
 
-                // Converte pixel -> coordenadas (ScottPlot 5.1.57)
+                // Converte pixel → coordenadas
                 ScottPlot.Coordinates coord;
                 try
                 {
                     coord = grafico.Plot.GetCoordinates(new ScottPlot.Pixel(e.X, e.Y));
                 }
-                catch (Exception getCoordEx)
+                catch
+                {
+                    lblValorHover.Visible = false;
+                    return;
+                }
+
+                // Se o mouse estiver fora dos limites do eixo X (ou Y), oculta o label
+                var limits = grafico.Plot.Axes.GetLimits();
+                if (coord.X < limits.XRange.Min || coord.X > limits.XRange.Max ||
+    coord.Y < limits.YRange.Min || coord.Y > limits.YRange.Max)
+
                 {
                     lblValorHover.Visible = false;
                     return;
                 }
 
                 double mouseX = coord.X;
-
-                // Encontra o ponto mais próximo
                 int idx = NearestIndexBinarySearch(currentXs, mouseX);
-
                 if (idx < 0 || idx >= currentYs.Length)
                 {
                     lblValorHover.Visible = false;
@@ -865,26 +958,33 @@ namespace AnaliseAcoes
                 lblValorHover.Visible = true;
                 lblValorHover.BringToFront();
 
-                // posição do label relativa ao Form (o evento fornece coords relativos ao grafico)
-                // ajusta para coordenadas do Form
+                // Converte posição relativa ao Form
                 Point formPos = grafico.PointToScreen(new Point(e.X, e.Y));
                 Point clientPos = this.PointToClient(formPos);
 
                 int px = clientPos.X + 12;
                 int py = clientPos.Y + 12;
 
-                // evita overflow no form
-                if (px + lblValorHover.Width > this.ClientSize.Width) px = this.ClientSize.Width - lblValorHover.Width - 8;
-                if (py + lblValorHover.Height > this.ClientSize.Height) py = this.ClientSize.Height - lblValorHover.Height - 8;
+                if (px + lblValorHover.Width > this.ClientSize.Width)
+                    px = this.ClientSize.Width - lblValorHover.Width - 8;
+                if (py + lblValorHover.Height > this.ClientSize.Height)
+                    py = this.ClientSize.Height - lblValorHover.Height - 8;
 
                 lblValorHover.Location = new Point(px, py);
             }
-            catch (Exception ex)
+            catch
             {
-                // não lançar exceção que quebre o app; loga no status
-                lblStatus.Text = "Erro hover: " + ex.Message;
+                lblValorHover.Visible = false;
             }
         }
+
+        private void Grafico_MouseLeave(object? sender, EventArgs e)
+        {
+            // Oculta o label ao sair completamente do gráfico
+            if (lblValorHover != null)
+                lblValorHover.Visible = false;
+        }
+
         private int NearestIndexBinarySearch(double[] xs, double x)
         {
             int left = 0, right = xs.Length - 1;
