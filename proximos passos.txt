@@ -1,3 +1,8 @@
 
-- Criar botão para liquidação (vender). Seja vender tudo ou parte do que tem.
+- Criar botão para liquidação (vender). 
+  - Checkbox
+    - Vender Tudo
+    - Parte
+      -Quantidade à ser vendida
+
 
