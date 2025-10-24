@@ -1,4 +1,4 @@
-- Calcular Stoploss em relação ao preço médio e ativar sinal de venda
-- Calcular Alvo em relação ao preço médio e ativar sinal de venda
-- Criar botão para liquidação (vender). Seja vender tudo ou parte do que tem
-- Programar o botão Atualizar Preços usando YahooFinanceAPI
+- Calcular Stoploss em relação ao preço médio (Ok) e ativar sinal de venda (Será configurado quando o botão atualizar preços estiver funcionando)
+- Calcular Alvo em relação ao preço médio (Ok) e ativar sinal de venda (Será configurado quando o botão atualizar preços estiver funcionando)
+- Criar botão para liquidação (vender). Seja vender tudo ou parte do que tem.
+- Programar o botão Atualizar Preços usando YahooFinanceAPI.
