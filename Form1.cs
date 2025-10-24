@@ -17,15 +17,15 @@ using WFLabel = System.Windows.Forms.Label;
 using System.Security.Cryptography.X509Certificates;
 
 
-
 namespace AnaliseAcoes
 {
     public partial class Form1 : Form
     {       
         //Cores customizadas
-        WFColor OVERSELECTION = WFColor.FromArgb(34, 16, 82);
+        public static WFColor OVERSELECTION = WFColor.FromArgb(34, 16, 82);
         WFColor CORHEADERSBACK = WFColor.FromArgb(70, 70, 70);
-        WFColor CORFORE = WFColor.White;
+        public static WFColor CORFORE = WFColor.White;
+        public static WFColor BACKGROUND = WFColor.FromArgb(40, 40, 40);
 
         public enum TipoOperacao
         {
@@ -36,21 +36,24 @@ namespace AnaliseAcoes
         private ComboBox cmbCodigo;
         private Button btnBuscar;
         private Button btnAtualizar, btnAdicionar, btnAtualizarPreco, btnRemover;
-        private WFLabel lblStatus, lblTotalInvestido, lblGanhoPerda, lblSaldo, lblGanhoPerdaValor;
+        private WFLabel lblStatus, lblTotalInvestido, lblGanhoPerda, lblSaldo, lblGanhoPerdaValor, lblValorHover;
         private FormsPlot grafico;
         private DataGridView grid;
 
         private List<AcaoInfo> acoes = new List<AcaoInfo>();
         private List<string> tickersFiltrados = new();
-        private readonly string caminhoArquivo = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "dados", "acoes.json");        
+        private readonly string caminhoArquivo = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "dados", "acoes.json");
 
-        
+        // dentro da classe Form1
+        private double[] currentXs = Array.Empty<double>();
+        private double[] currentYs = Array.Empty<double>();
+
 
         public Form1()
         {
             InitializeComponent();
             InicializarGraficoAnalise();
-
+            this.BackColor = BACKGROUND;
             this.Width = 1910;
             this.Height = 1000;
 
@@ -471,7 +474,7 @@ namespace AnaliseAcoes
             public List<AcaoInfo> Acoes { get; set; } = new List<AcaoInfo>();
             public decimal Saldo { get; set; } = 0;
         }
-        private Button CriarBotao(string texto)
+        public static Button CriarBotao(string texto)
         {
             return new Button
             {
@@ -535,8 +538,10 @@ namespace AnaliseAcoes
             this.Controls.Add(btnAtualizar);
             this.Controls.Add(lblStatus);
             this.Controls.Add(grafico);
+
+            
+
         }
-        
         private void CarregarTickers()
         {
 
@@ -786,7 +791,118 @@ namespace AnaliseAcoes
             grafico.Plot.Title($"Análise de {codigo}");
 
             grafico.Refresh();
+
+            // chatgpt generated code to show values on hover
+            // guarda os dados em campos para o handler acessar
+            currentXs = xs;
+            currentYs = ys;
+
+            // cria label hover se necessário (como filho do Form para ficar acima do gráfico)
+            if (lblValorHover == null)
+            {
+                lblValorHover = new WFLabel
+                {
+                    AutoSize = true,
+                    BackColor = WFColor.FromArgb(40, 40, 40),
+                    ForeColor = WFColor.White,
+                    Visible = false
+                };
+                // adiciona no Form (não dentro do grafico) para garantir que fique acima do render
+                this.Controls.Add(lblValorHover);
+                lblValorHover.BringToFront();
+            }
+
+            // remove handlers duplicados antes de adicionar (segurança)
+            grafico.MouseMove -= Grafico_MouseMove;
+            grafico.MouseLeave -= Grafico_MouseLeave;
+
+            // registra (faça isso sempre após configurar o gráfico)
+            grafico.MouseMove += Grafico_MouseMove;
+            grafico.MouseLeave += Grafico_MouseLeave;
+
+
         }
+        private void Grafico_MouseLeave(object? sender, EventArgs e)
+        {
+            if (lblValorHover != null) lblValorHover.Visible = false;
+        }
+
+
+        private void Grafico_MouseMove(object? sender, MouseEventArgs e)
+        {
+            try
+            {
+                if (currentXs == null || currentYs == null || currentXs.Length == 0)
+                    return;
+
+                // Converte pixel -> coordenadas (ScottPlot 5.1.57)
+                ScottPlot.Coordinates coord;
+                try
+                {
+                    coord = grafico.Plot.GetCoordinates(new ScottPlot.Pixel(e.X, e.Y));
+                }
+                catch (Exception getCoordEx)
+                {
+                    lblValorHover.Visible = false;
+                    return;
+                }
+
+                double mouseX = coord.X;
+
+                // Encontra o ponto mais próximo
+                int idx = NearestIndexBinarySearch(currentXs, mouseX);
+
+                if (idx < 0 || idx >= currentYs.Length)
+                {
+                    lblValorHover.Visible = false;
+                    return;
+                }
+
+                DateTime data = DateTime.FromOADate(currentXs[idx]);
+                double preco = currentYs[idx];
+
+                lblValorHover.Text = $"{data:dd/MM/yyyy}  |  R$ {preco:F2}";
+                lblValorHover.Visible = true;
+                lblValorHover.BringToFront();
+
+                // posição do label relativa ao Form (o evento fornece coords relativos ao grafico)
+                // ajusta para coordenadas do Form
+                Point formPos = grafico.PointToScreen(new Point(e.X, e.Y));
+                Point clientPos = this.PointToClient(formPos);
+
+                int px = clientPos.X + 12;
+                int py = clientPos.Y + 12;
+
+                // evita overflow no form
+                if (px + lblValorHover.Width > this.ClientSize.Width) px = this.ClientSize.Width - lblValorHover.Width - 8;
+                if (py + lblValorHover.Height > this.ClientSize.Height) py = this.ClientSize.Height - lblValorHover.Height - 8;
+
+                lblValorHover.Location = new Point(px, py);
+            }
+            catch (Exception ex)
+            {
+                // não lançar exceção que quebre o app; loga no status
+                lblStatus.Text = "Erro hover: " + ex.Message;
+            }
+        }
+        private int NearestIndexBinarySearch(double[] xs, double x)
+        {
+            int left = 0, right = xs.Length - 1;
+            while (left <= right)
+            {
+                int mid = (left + right) / 2;
+                if (xs[mid] < x) left = mid + 1;
+                else right = mid - 1;
+            }
+
+            if (left == 0) return 0;
+            if (left >= xs.Length) return xs.Length - 1;
+
+            double distLeft = Math.Abs(xs[left - 1] - x);
+            double distRight = Math.Abs(xs[left] - x);
+            return distLeft < distRight ? left - 1 : left;
+        }
+
     }
     public class Cotacao
     {
