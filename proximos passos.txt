@@ -1,8 +1,1 @@
-
-- Criar botão para liquidação (vender). 
-  - Checkbox
-    - Vender Tudo
-    - Parte
-      -Quantidade à ser vendida
-
-
+Criar legendas ao lado do botão liquidação para indicar que Vermellho = Alerta Vender (stop loss) e Verde = Alerta Vender (Alvo)
