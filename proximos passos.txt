@@ -1,3 +1,2 @@
 
-- Adicionar um botão para pegar o Ticker na tabela e exibir o gráfico dele
 - Adicionar MACD ou RSI (Mais simples segundo GPT)
