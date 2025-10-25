@@ -1,3 +1,3 @@
 
-- Adicionar Suporte e Resistência
+- Adicionar Suporte e Resistência - estou adicionando no gráfico
 - Adicionar MACD ou RSI (Mais simples segundo GPT)
