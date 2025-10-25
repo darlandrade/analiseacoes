@@ -42,11 +42,13 @@ namespace AnaliseAcoes
         }
 
         private Panel pnBotoes, pnLiquida;
+        private Panel pnLSLVermelho, pnAVerde;
 
         private ComboBox cmbCodigo;
         private Button btnBuscar;
         private Button btnAtualizar, btnLiquida;
         private WFLabel lblStatus, lblTotalInvestido, lblGanhoPerda, lblSaldo, lblGanhoPerdaValor, lblValorHover;
+        private WFLabel lbLegendaStopLoss, lbLgendaAlvo;
         private FormsPlot grafico;
         private DataGridView grid;
 
@@ -129,7 +131,7 @@ namespace AnaliseAcoes
                 {
                     case 0:
                         lblTotalInvestido = label;
-                        label.Margin = new Padding(10, 5, 120, 5);
+                        label.Margin = new Padding(20, 5, 100, 5);
                         break;
                     case 1:
                         lblGanhoPerda = label;
@@ -137,7 +139,7 @@ namespace AnaliseAcoes
                         break;
                     case 2:
                         lblGanhoPerdaValor = label;
-                        label.Margin = new Padding(0, 5, 120, 5); // margem esquerda zero para colar no anterior
+                        label.Margin = new Padding(0, 5, 100, 5); // margem esquerda zero para colar no anterior
                         break;
                     case 3:
                         lblSaldo = label;
@@ -206,6 +208,30 @@ namespace AnaliseAcoes
             pnLiquida.Controls.Add(btnLiquida);
 
             btnLiquida.Click += (s, e) => liquidarAcoes();
+
+            pnLSLVermelho = new Panel
+            {
+                BorderStyle = BorderStyle.FixedSingle,
+                Location = new Point(btnLiquida.Width + 20, 5),
+                Size = new Size(30, 30),
+                BackColor = WFColor.FromArgb(117, 57, 57)
+            };
+            pnLiquida.Controls.Add(pnLSLVermelho);
+            lbLegendaStopLoss = CriarLabel("Stop Loss Atingido");   
+            lbLegendaStopLoss.Location = new Point(pnLSLVermelho.Location.X + pnLSLVermelho.Width + 5, 10);
+            pnLiquida.Controls.Add(lbLegendaStopLoss);
+
+            pnAVerde = new Panel
+            {
+                BorderStyle = BorderStyle.FixedSingle,
+                Location = new Point(lbLegendaStopLoss.Location.X + lbLegendaStopLoss.Width + 20, 5),
+                Size = new Size(30, 30),
+                BackColor = WFColor.FromArgb(67, 117, 57)
+            };
+            pnLiquida.Controls.Add(pnAVerde);
+            lbLgendaAlvo = CriarLabel("Alvo Atingido");
+            lbLgendaAlvo.Location = new Point(pnAVerde.Location.X + pnAVerde.Width + 5, 10);
+            pnLiquida.Controls.Add(lbLgendaAlvo);
         }
 
         // Função para liquidar ações
