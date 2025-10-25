@@ -1,3 +1,3 @@
-- Mudar a seleção de linha do grid quando o mouse estiver no grid e o mouse Wheel for usado.
+
 - Adicionar Suporte e Resistência
 - Adicionar MACD ou RSI (Mais simples segundo GPT)
