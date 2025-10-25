@@ -190,8 +190,12 @@ namespace AnaliseAcoes
                 ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
                 };
 
+            // Configurações do grid
             grid.CellPainting += dataGridView1_CellPainting;
             grid.ShowCellToolTips = false;
+            grid.MouseWheel += DataGridView1_MouseWheel;
+
+            // Add grid ao painel
             pnCompraVenda.Controls.Add(grid);
             ConfigurarGrid();
 
@@ -1092,6 +1096,26 @@ namespace AnaliseAcoes
                 e.PaintContent(e.ClipBounds);
                 e.Handled = true;
             }
+        }
+
+        private void DataGridView1_MouseWheel(object sender, MouseEventArgs e)
+        {
+            if (grid.RowCount == 0) return;
+
+            int indexAtual = grid.CurrentCell?.RowIndex ?? 0;
+
+            if (e.Delta > 0 && indexAtual > 0)
+            {
+                // Scroll para cima
+                grid.CurrentCell = grid.Rows[indexAtual - 1].Cells[0];
+            }
+            else if (e.Delta < 0 && indexAtual < grid.RowCount - 1)
+            {
+                // Scroll para baixo
+                grid.CurrentCell = grid.Rows[indexAtual + 1].Cells[0];
+            }
+
+            grid.Rows[grid.CurrentCell.RowIndex].Selected = true;
         }
     }
 
