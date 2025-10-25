@@ -1,22 +1,23 @@
+using AnaliseAcoes;
+using ScottPlot;
+using ScottPlot.Colormaps;
+using ScottPlot.Panels;
+using ScottPlot.WinForms;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
-using System.Threading;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using ScottPlot;
-using ScottPlot.WinForms;
 using YahooFinanceApi;
-using AnaliseAcoes;
-
 using WFColor = System.Drawing.Color;
-using WFLabel = System.Windows.Forms.Label;
 using WFFont = System.Drawing.Font;
-using System.Security.Cryptography.X509Certificates;
+using WFLabel = System.Windows.Forms.Label;
 
 
 namespace AnaliseAcoes
@@ -45,7 +46,7 @@ namespace AnaliseAcoes
         private Panel pnLSLVermelho, pnAVerde;
 
         private ComboBox cmbCodigo;
-        private Button btnBuscar;
+        private Button btnBuscar, btnPesquisarTickerGrid;
         private Button btnAtualizar, btnLiquida;
         private WFLabel lblStatus, lblTotalInvestido, lblGanhoPerda, lblSaldo, lblGanhoPerdaValor, lblValorHover;
         private WFLabel lbLegendaStopLoss, lbLgendaAlvo;
@@ -70,7 +71,7 @@ namespace AnaliseAcoes
             this.BackColor = BACKGROUND;
             this.Width = 1910;
             this.Height = 1000;
-
+            this.StartPosition = FormStartPosition.CenterScreen;
             InicializarCompraEVenda();      
             AtualizarGrid(new BDInfoGrid());
 
@@ -236,6 +237,12 @@ namespace AnaliseAcoes
             lbLgendaAlvo = CriarLabel("Alvo Atingido");
             lbLgendaAlvo.Location = new Point(pnAVerde.Location.X + pnAVerde.Width + 5, 10);
             pnLiquida.Controls.Add(lbLgendaAlvo);
+
+            btnPesquisarTickerGrid = CriarBotao("Pesquisar Ticker");
+            btnPesquisarTickerGrid.Location = new Point(lbLgendaAlvo.Location.X + lbLgendaAlvo.Width + 50, 5);
+            pnLiquida.Controls.Add(btnPesquisarTickerGrid);
+            btnPesquisarTickerGrid.Click += BtnBuscar_Click;
+            
         }
 
         // Função para liquidar ações
@@ -306,7 +313,7 @@ namespace AnaliseAcoes
             {
                 Text = "Adicionar Saldo",
                 Size = new Size(300, 150),
-                StartPosition = FormStartPosition.CenterParent,
+                StartPosition = FormStartPosition.CenterScreen,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
                 MinimizeBox = false
@@ -647,9 +654,7 @@ namespace AnaliseAcoes
         // ========================================
         private void InicializarGraficoAnalise()
         {
-            this.Text = "Análise de Ações - EMA 21 e EMA 9";
-            //this.Size = new Size(1000, 600);
-            this.StartPosition = FormStartPosition.CenterScreen;
+            this.Text = "Análise de Ações - EMA 21 e EMA 9";            
             this.BackColor = WFColor.FromArgb(40, 40, 40);
 
             cmbCodigo = new ComboBox
@@ -668,7 +673,7 @@ namespace AnaliseAcoes
             btnAtualizar.Location = new Point(280, 18);
             btnAtualizar.Width = 120;
 
-            lblStatus = new WFLabel { Location = new Point(420, 22), AutoSize = true, ForeColor = WFColor.LightGray };
+            lblStatus = new WFLabel { Location = new Point(10, 550), AutoSize = true, ForeColor = WFColor.LightGray, Font = FONTEPADRAO(t: 12) };
 
             grafico = new FormsPlot { Location = new Point(20, 60), Size = new Size(940, 480) };
 
@@ -679,9 +684,7 @@ namespace AnaliseAcoes
             this.Controls.Add(btnBuscar);
             this.Controls.Add(btnAtualizar);
             this.Controls.Add(lblStatus);
-            this.Controls.Add(grafico);
-
-            
+            this.Controls.Add(grafico);            
 
         }
         private void CarregarTickers()
@@ -705,7 +708,6 @@ namespace AnaliseAcoes
                 if (tickers.Count > 0)
                 {
                     cmbCodigo.Items.AddRange(tickersFiltrados.ToArray());
-                    //lblStatus.Text = $"{tickersFiltrados.Count} tickers carregados.";
                     cmbCodigo.SelectedIndex = 0;
                 }
                 else
@@ -860,7 +862,18 @@ namespace AnaliseAcoes
 
         private void BtnBuscar_Click(object sender, EventArgs e)
         {
-            string codigo = cmbCodigo.Text.Trim().ToUpper();
+            // O botão que foi clicado
+            Button botao = sender as Button;
+            string codigo = "";
+            if (botao == btnBuscar)
+            {
+                codigo = cmbCodigo.Text.Trim().ToUpper();
+            }
+            else if (botao == btnPesquisarTickerGrid)
+            {
+                codigo = grid.SelectedRows[0].Cells["Ticker"].Value.ToString().Substring(0, 5);
+            }
+
             if (string.IsNullOrEmpty(codigo))
             {
                 MessageBox.Show("Selecione ou digite o código da ação.");
@@ -886,11 +899,43 @@ namespace AnaliseAcoes
 
                 ExibirGrafico(dados, ema21, ema9, codigo);
 
+                //double ultimoPreco = dados[^1].Close;
+                //double ultimaEMA21 = ema21[^1];
+                //double ultimaEMA9 = ema9[^1];
+                //string sinal = ultimoPreco > ultimaEMA21 ? "📈 COMPRA" :
+                //               ultimoPreco < ultimaEMA21 ? "📉 VENDA" : "🔹 NEUTRO";
+
+                // ALEM DA EMA21, USA SUPORTE E RESISTÊNCIA PARA MELHORAR O SINAL
                 double ultimoPreco = dados[^1].Close;
                 double ultimaEMA21 = ema21[^1];
                 double ultimaEMA9 = ema9[^1];
-                string sinal = ultimoPreco > ultimaEMA21 ? "📈 COMPRA" :
-                               ultimoPreco < ultimaEMA21 ? "📉 VENDA" : "🔹 NEUTRO";
+
+                // Calcula suportes e resistências
+                var (suportes, resistencias) = CalcularSuporteResistencia(dados);
+
+                // Define tolerância (distância em % para considerar "próximo" do suporte ou resistência)
+                double tolerancia = 0.01; // 1%
+
+                // Encontra o suporte e resistência mais próximos do preço atual
+                double suporteMaisProximo = suportes.OrderBy(s => Math.Abs(s - ultimoPreco)).FirstOrDefault();
+                double resistenciaMaisProxima = resistencias.OrderBy(r => Math.Abs(r - ultimoPreco)).FirstOrDefault();
+
+                // Verifica se o preço está próximo de algum deles
+                bool pertoDoSuporte = Math.Abs((ultimoPreco - suporteMaisProximo) / ultimoPreco) < tolerancia;
+                bool pertoDaResistencia = Math.Abs((ultimoPreco - resistenciaMaisProxima) / ultimoPreco) < tolerancia;
+
+                // Gera o sinal combinando EMA21 e suporte/resistência
+                string sinal;
+                if (ultimoPreco > ultimaEMA21 && pertoDoSuporte)
+                    sinal = "🟢 COMPRA (acima da EMA21 e perto do suporte)";
+                else if (ultimoPreco < ultimaEMA21 && pertoDaResistencia)
+                    sinal = "🔴 VENDA (abaixo da EMA21 e perto da resistência)";
+                else if (ultimoPreco > ultimaEMA21)
+                    sinal = "📈 TENDÊNCIA DE ALTA (acima da EMA21)";
+                else if (ultimoPreco < ultimaEMA21)
+                    sinal = "📉 TENDÊNCIA DE BAIXA (abaixo da EMA21)";
+                else
+                    sinal = "🔹 NEUTRO (sem sinal claro)";
 
                 lblStatus.Text = $"Último preço: {ultimoPreco:F2} | EMA21: {ultimaEMA21:F2} | EMA9: {ultimaEMA9:F2} → Sinal: {sinal}";
             }
@@ -942,11 +987,18 @@ namespace AnaliseAcoes
 
             grafico.Plot.Axes.DateTimeTicksBottom();
             grafico.Plot.Add.Legend();
-
             grafico.Plot.Title($"Análise de {codigo}");
 
             grafico.Refresh();
 
+            // suporte e resistência
+            var (suportes, resistencias) = CalcularSuporteResistencia(dados);
+            foreach (var s in suportes)
+                grafico.Plot.Add.HorizontalLine(s, color: Colors.DarkBlue, pattern: LinePattern.Dashed);
+
+            foreach (var r in resistencias)
+                grafico.Plot.Add.HorizontalLine(r, color: Colors.FireBrick, pattern: LinePattern.Dashed);
+            grafico.Refresh();
             // guarda os dados em campos para o handler acessar
             currentXs = xs;
             currentYs = ys;
@@ -974,6 +1026,20 @@ namespace AnaliseAcoes
             grafico.MouseMove += Grafico_MouseMove;
             grafico.MouseLeave += Grafico_MouseLeave;
 
+            
+
+            // grafico rsi
+            //var rsi = CalcularRSI(dados);
+            //var eixoRSI = grafico.Plot.Add.AxisY2();
+            //grafico.Plot.Add.Scatter(
+            //    xs: Enumerable.Range(0, rsi.Count).Select(i => (double)i).ToArray(),
+            //    ys: rsi.ToArray(),
+            //    color: Colors.Orange
+            //    //TitlePanel: "RSI"
+            //    );
+
+            //grafico.Plot.Add.HorizontalLine(70, color: Colors.Red, lineStyle: LineStyle.Dash);
+            //grafico.Plot.Add.HorizontalLine(30, color: Colors.Green, lineStyle: LineStyle.Dash);
 
         }
         private void Grafico_MouseMove(object? sender, MouseEventArgs e)
@@ -1117,6 +1183,75 @@ namespace AnaliseAcoes
 
             grid.Rows[grid.CurrentCell.RowIndex].Selected = true;
         }
+
+        // Calculo de Suporte e Resistencia
+        private (List<double> suportes, List<double> resistencias) CalcularSuporteResistencia(List<Cotacao> dados)
+        {
+            var suportes = new List<double>();
+            var resistencias = new List<double>();
+
+            if (dados.Count < 10)
+                return (suportes, resistencias);
+
+            double tolerancia = 0.015; // 1.5% de variação aceitável entre níveis
+
+            for (int i = 2; i < dados.Count - 2; i++)
+            {
+                double p = dados[i].Close;
+
+                // Detecta suporte (mínimo local)
+                if (p < dados[i - 1].Close && p < dados[i - 2].Close &&
+                    p < dados[i + 1].Close && p < dados[i + 2].Close)
+                {
+                    // Verifica se já existe suporte próximo
+                    if (!suportes.Any(s => Math.Abs((s - p) / p) < tolerancia))
+                        suportes.Add(p);
+                }
+
+                // Detecta resistência (máximo local)
+                if (p > dados[i - 1].Close && p > dados[i - 2].Close &&
+                    p > dados[i + 1].Close && p > dados[i + 2].Close)
+                {
+                    // Verifica se já existe resistência próxima
+                    if (!resistencias.Any(r => Math.Abs((r - p) / p) < tolerancia))
+                        resistencias.Add(p);
+                }
+            }
+
+            suportes = suportes.OrderBy(x => x).ToList();
+            resistencias = resistencias.OrderBy(x => x).ToList();
+
+            return (suportes, resistencias);
+        }
+        // Indicador RSI
+        private List<double> CalcularRSI(List<Cotacao> cotacoes, int periodo = 14)
+        {
+            var rsi = new List<double>();
+            if (cotacoes.Count < periodo + 1)
+                return rsi;
+
+            for (int i = periodo; i < cotacoes.Count; i++)
+            {
+                double ganho = 0;
+                double perda = 0;
+                for (int j = i - periodo + 1; j <= i; j++)
+                {
+                    double diff = cotacoes[j].Close - cotacoes[j - 1].Close;
+                    if (diff >= 0)
+                        ganho += diff;
+                    else
+                        perda -= diff;
+                }
+
+                double rs = (perda == 0) ? 100 : ganho / perda;
+                double valorRSI = 100 - (100 / (1 + rs));
+                rsi.Add(valorRSI);
+            }
+
+            return rsi;
+        }
+        
+
     }
 
     public class Cotacao
