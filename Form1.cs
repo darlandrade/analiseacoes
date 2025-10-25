@@ -11,6 +11,7 @@ using System.Windows.Forms;
 using ScottPlot;
 using ScottPlot.WinForms;
 using YahooFinanceApi;
+using AnaliseAcoes;
 
 using WFColor = System.Drawing.Color;
 using WFLabel = System.Windows.Forms.Label;
@@ -23,8 +24,9 @@ namespace AnaliseAcoes
     public partial class Form1 : Form
     {       
         //Cores customizadas
-        public static WFColor OVERSELECTION = WFColor.FromArgb(34, 16, 82);
-        WFColor CORHEADERSBACK = WFColor.FromArgb(70, 70, 70);
+        public static WFColor OVERSELECTION = WFColor.FromArgb(112,21,12); // Cor Hover do botão
+        public static WFColor MOUSEDOWNCOLOR = WFColor.FromArgb(120, 36, 29); // Cor quando o botão é clicado
+        WFColor CORHEADERSBACK = WFColor.FromArgb(70, 70, 70); // Cor de fundo dos headers do grid
         public static WFColor CORFORE = WFColor.White;
         public static WFColor BACKGROUND = WFColor.FromArgb(40, 40, 40);
         public static WFFont FONTEPADRAO(string nome="Consolas", int t = 9)
@@ -39,14 +41,16 @@ namespace AnaliseAcoes
             Venda
         }
 
-        private Panel pnBotoes;
+        private Panel pnBotoes, pnLiquida;
 
         private ComboBox cmbCodigo;
         private Button btnBuscar;
-        private Button btnAtualizar, btnAdicionar, btnAtualizarPreco, btnRemover;
+        private Button btnAtualizar, btnLiquida;
         private WFLabel lblStatus, lblTotalInvestido, lblGanhoPerda, lblSaldo, lblGanhoPerdaValor, lblValorHover;
         private FormsPlot grafico;
         private DataGridView grid;
+
+        private decimal tInvestidoGeral = 0;
 
         private List<AcaoInfo> acoes = new List<AcaoInfo>();
         private List<string> tickersFiltrados = new();
@@ -78,7 +82,7 @@ namespace AnaliseAcoes
             // Popula o ComboBox ao iniciar
             CarregarTickers();            
         }
-
+        
         // ========================================
         // Inicializa a seção de Compra e Venda
         // ========================================
@@ -86,8 +90,9 @@ namespace AnaliseAcoes
         {
             Panel pnCompraVenda = new Panel
             {
+                BorderStyle = BorderStyle.FixedSingle,
                 Location = new Point(970, 10),
-                Size = new Size(920, 600)
+                Size = new Size(920, 540)
             };
             this.Controls.Add(pnCompraVenda);
 
@@ -181,13 +186,52 @@ namespace AnaliseAcoes
 
                 // Headers estilizados
                 ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
-
                 };
 
-            
-
+            grid.CellPainting += dataGridView1_CellPainting;
+            grid.ShowCellToolTips = false;
             pnCompraVenda.Controls.Add(grid);
             ConfigurarGrid();
+
+            // Liquidação
+            pnLiquida = new Panel
+            {
+                BorderStyle = BorderStyle.FixedSingle,
+                Location = new Point(970, 550),
+                Size = new Size(920, 40)
+            };
+            this.Controls.Add(pnLiquida);
+            btnLiquida = CriarBotao("Liquidação");
+            btnLiquida.Location = new Point(10, 5);
+            pnLiquida.Controls.Add(btnLiquida);
+
+            btnLiquida.Click += (s, e) => liquidarAcoes();
+        }
+
+        // Função para liquidar ações
+        private void liquidarAcoes()
+        {
+            string ticker = grid.SelectedRows[0].Cells["Ticker"].Value.ToString();
+            int quantidade = Convert.ToInt32(grid.SelectedRows[0].Cells["Quantidade"].Value);
+            decimal vAtual = Convert.ToDecimal(grid.SelectedRows[0].Cells["PrecoAtual"].Value);
+            decimal pMedio = Convert.ToDecimal(grid.SelectedRows[0].Cells["PrecoMedio"].Value);
+            int inicio = ticker.IndexOf('(');
+            int fim = ticker.IndexOf(')');
+
+            string comprado = (inicio >= 0 && fim > inicio)
+                ? ticker.Substring(inicio + 1, fim - inicio - 1)
+                : "";
+
+            bool estaComprado = comprado == "C";
+            var form = new FormLiquidaAcoes(ticker.Substring(0, 5), quantidade, tInvestidoGeral, pMedio, vAtual, estaComprado, acoes);
+            form.AoFechar += () =>
+            {
+                CarregarDadosDoArquivo();
+                AtualizarGrid(new BDInfoGrid { Acoes = acoes });
+                AtualizarStatusLabels(new BDInfoGrid { Acoes = acoes });
+                CarregarSaldo();
+            };
+            form.ShowDialog();
 
         }
 
@@ -469,6 +513,8 @@ namespace AnaliseAcoes
         private void AtualizarStatusLabels(BDInfoGrid bdInfo)
         {
             decimal totalInvestido = bdInfo.Acoes.Sum(a => a.PrecoMedio * a.Quantidade);
+            decimal valorAtualTotal = bdInfo.Acoes.Sum(a => a.PrecoAtual * a.Quantidade);
+
 
             decimal saldo = bdInfo.Saldo;
             if (lblTotalInvestido == null)
@@ -477,49 +523,38 @@ namespace AnaliseAcoes
                 return;
             }
             lblTotalInvestido.Text = $"Total Investido: {totalInvestido.ToString("C2", new CultureInfo("pt-BR"))}";
-            
+            tInvestidoGeral = totalInvestido;
+
             lblSaldo.Text = $"Saldo: {saldo.ToString("C2", new CultureInfo("pt-BR"))}";      
             atualizaGanhoPerda(bdInfo);
 
         }
         // Campos para pesquisa no JSON
-        private class AcaoInfo
-        {
-            public string Ticker { get; set; }
-            public int Quantidade { get; set; }
-            public decimal PrecoMedio { get; set; }
-            public decimal PrecoAtual { get; set; }
-            public decimal TotalInvestido { get; set; }
-            public decimal StopLoss { get; set; }
-            public decimal Alvo { get; set; }
-            public decimal Valorizacao { get; set; }
-            public DateTime Data { get; set; }
-            public string Operacao { get; set; }
-        }
+        
         // Estrutura do banco de dados para o DataGridView
         private class BDInfoGrid
         {
             public List<AcaoInfo> Acoes { get; set; } = new List<AcaoInfo>();
             public decimal Saldo { get; set; } = 0;
         }
-        public static Button CriarBotao(string texto)
+        public static Button CriarBotao(string texto, int largura=150, int altura=30)
         {
             return new Button
             {
                 Text = texto,
-                Width = 150,
-                Height = 30,
+                Width = largura,
+                Height = altura,
                 Margin = new Padding(10, 10, 0, 0),
                 ForeColor = CORFORE,
                 BackColor = WFColor.FromArgb(70, 70, 70),
                 FlatStyle = FlatStyle.Flat,
                 Font = FONTEPADRAO(t:10),
-                FlatAppearance = { BorderSize = 0, MouseDownBackColor = WFColor.FromArgb(49, 30, 102), MouseOverBackColor = OVERSELECTION }
+                FlatAppearance = { BorderSize = 0, MouseDownBackColor = MOUSEDOWNCOLOR, MouseOverBackColor = OVERSELECTION }
                 
             };
         }
         // Helper para criar labels
-        private WFLabel CriarLabel(string texto)
+        public static WFLabel CriarLabel(string texto)
         {
             return new WFLabel
             {
@@ -877,11 +912,11 @@ namespace AnaliseAcoes
 
             grafico.Plot.Axes.DateTimeTicksBottom();
             grafico.Plot.Add.Legend();
+
             grafico.Plot.Title($"Análise de {codigo}");
 
             grafico.Refresh();
 
-            // chatgpt generated code to show values on hover
             // guarda os dados em campos para o handler acessar
             currentXs = xs;
             currentYs = ys;
@@ -1003,7 +1038,37 @@ namespace AnaliseAcoes
             return distLeft < distRight ? left - 1 : left;
         }
 
+        public static void AplicarScrollSuave(NumericUpDown controle)
+        {
+            controle.MouseWheel += (s, e) =>
+            {
+                var me = (HandledMouseEventArgs)e;
+                me.Handled = true;
+
+                if (e.Delta > 0)
+                    controle.Value = Math.Min(controle.Maximum, controle.Value + 1);
+                else
+                    controle.Value = Math.Max(controle.Minimum, controle.Value - 1);
+            };
+        }
+        private void dataGridView1_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+        {
+            if (e.RowIndex >= 0 && grid.Rows[e.RowIndex].Selected)
+            {
+                e.PaintBackground(e.ClipBounds, true);
+
+                // Cria uma sobreposição semi-transparente
+                using (Brush brilho = new SolidBrush(WFColor.FromArgb(30, WFColor.White)))
+                {
+                    e.Graphics.FillRectangle(brilho, e.CellBounds);
+                }
+
+                e.PaintContent(e.ClipBounds);
+                e.Handled = true;
+            }
+        }
     }
+
     public class Cotacao
     {
         public DateTime Data { get; set; }
