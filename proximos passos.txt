@@ -1,2 +1,1 @@
-
-- Adicionar MACD ou RSI (Mais simples segundo GPT)
+- Adicionar MACD
