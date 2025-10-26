@@ -50,7 +50,7 @@ namespace AnaliseAcoes
         private Button btnAtualizar, btnLiquida;
         private WFLabel lblStatus, lblTotalInvestido, lblGanhoPerda, lblSaldo, lblGanhoPerdaValor, lblValorHover;
         private WFLabel lbLegendaStopLoss, lbLgendaAlvo;
-        private FormsPlot grafico;
+        private FormsPlot grafico, graficoRsi;
         private DataGridView grid;
 
         private decimal tInvestidoGeral = 0;
@@ -83,7 +83,8 @@ namespace AnaliseAcoes
             banco.CriarTabela();
 
             // Popula o ComboBox ao iniciar
-            CarregarTickers();            
+            CarregarTickers();
+            this.KeyPreview = true;
         }
         
         // ========================================
@@ -93,7 +94,7 @@ namespace AnaliseAcoes
         {
             Panel pnCompraVenda = new Panel
             {
-                BorderStyle = BorderStyle.FixedSingle,
+                //BorderStyle = BorderStyle.FixedSingle,
                 Location = new Point(970, 10),
                 Size = new Size(920, 540)
             };
@@ -102,7 +103,7 @@ namespace AnaliseAcoes
             // Painel para botões
             pnBotoes = new Panel
             {
-                BorderStyle = BorderStyle.FixedSingle,
+                //BorderStyle = BorderStyle.FixedSingle,
                 Location = new Point(10, 5),
                 Size = new Size(900, 50)
             };
@@ -113,7 +114,7 @@ namespace AnaliseAcoes
             // Painel para labels de status
             FlowLayoutPanel pnStatus = new FlowLayoutPanel
             {
-                BorderStyle = BorderStyle.FixedSingle,
+                //BorderStyle = BorderStyle.FixedSingle,
                 Location = new Point(10, 65),
                 Size = new Size(900, 30),
                 FlowDirection = FlowDirection.LeftToRight,
@@ -203,7 +204,7 @@ namespace AnaliseAcoes
             // Liquidação
             pnLiquida = new Panel
             {
-                BorderStyle = BorderStyle.FixedSingle,
+                //BorderStyle = BorderStyle.FixedSingle,
                 Location = new Point(970, 550),
                 Size = new Size(920, 40)
             };
@@ -214,34 +215,36 @@ namespace AnaliseAcoes
 
             btnLiquida.Click += (s, e) => liquidarAcoes();
 
+            btnPesquisarTickerGrid = CriarBotao("Pesquisar Ticker");
+            btnPesquisarTickerGrid.Location = new Point(btnLiquida.Width + 20,  5);
+            pnLiquida.Controls.Add(btnPesquisarTickerGrid);
+            btnPesquisarTickerGrid.Click += BtnBuscar_Click;
+
             pnLSLVermelho = new Panel
             {
                 BorderStyle = BorderStyle.FixedSingle,
-                Location = new Point(btnLiquida.Width + 20, 5),
+                Location = new Point(btnPesquisarTickerGrid.Location.X + btnLiquida.Width + 10,  5),
                 Size = new Size(30, 30),
                 BackColor = WFColor.FromArgb(117, 57, 57)
             };
             pnLiquida.Controls.Add(pnLSLVermelho);
             lbLegendaStopLoss = CriarLabel("Stop Loss Atingido");   
-            lbLegendaStopLoss.Location = new Point(pnLSLVermelho.Location.X + pnLSLVermelho.Width + 5, 10);
+            lbLegendaStopLoss.Location = new Point(pnLSLVermelho.Location.X + pnLSLVermelho.Width + 10,  10);
             pnLiquida.Controls.Add(lbLegendaStopLoss);
 
             pnAVerde = new Panel
             {
                 BorderStyle = BorderStyle.FixedSingle,
-                Location = new Point(lbLegendaStopLoss.Location.X + lbLegendaStopLoss.Width + 20, 5),
+                Location = new Point(lbLegendaStopLoss.Location.X + lbLegendaStopLoss.Width + 10,  5),
                 Size = new Size(30, 30),
                 BackColor = WFColor.FromArgb(67, 117, 57)
             };
             pnLiquida.Controls.Add(pnAVerde);
             lbLgendaAlvo = CriarLabel("Alvo Atingido");
-            lbLgendaAlvo.Location = new Point(pnAVerde.Location.X + pnAVerde.Width + 5, 10);
+            lbLgendaAlvo.Location = new Point(pnAVerde.Location.X + pnAVerde.Width + 10, 10);
             pnLiquida.Controls.Add(lbLgendaAlvo);
 
-            btnPesquisarTickerGrid = CriarBotao("Pesquisar Ticker");
-            btnPesquisarTickerGrid.Location = new Point(lbLgendaAlvo.Location.X + lbLgendaAlvo.Width + 50, 5);
-            pnLiquida.Controls.Add(btnPesquisarTickerGrid);
-            btnPesquisarTickerGrid.Click += BtnBuscar_Click;
+            
             
         }
 
@@ -665,17 +668,19 @@ namespace AnaliseAcoes
                 AutoCompleteMode = AutoCompleteMode.SuggestAppend,
                 AutoCompleteSource = AutoCompleteSource.ListItems
             };
+            cmbCodigo.KeyDown += cmbCodigo_KeyDown;
 
             btnBuscar = CriarBotao("Buscar");
             btnBuscar.Location = new Point(180, 18);
             btnBuscar.Width = 80;
             btnAtualizar = CriarBotao("Atualizar Banco");
-            btnAtualizar.Location = new Point(280, 18);
+            btnAtualizar.Location = new Point(780, 18);
             btnAtualizar.Width = 120;
 
             lblStatus = new WFLabel { Location = new Point(10, 550), AutoSize = true, ForeColor = WFColor.LightGray, Font = FONTEPADRAO(t: 12) };
 
             grafico = new FormsPlot { Location = new Point(20, 60), Size = new Size(940, 480) };
+            graficoRsi = new FormsPlot { Location = new Point(20, 590), Size = new Size(940, 200) };
 
             btnBuscar.Click += BtnBuscar_Click;
             btnAtualizar.Click += BtnAtualizar_Click;
@@ -685,7 +690,7 @@ namespace AnaliseAcoes
             this.Controls.Add(btnAtualizar);
             this.Controls.Add(lblStatus);
             this.Controls.Add(grafico);            
-
+            this.Controls.Add(graficoRsi);
         }
         private void CarregarTickers()
         {
@@ -899,12 +904,6 @@ namespace AnaliseAcoes
 
                 ExibirGrafico(dados, ema21, ema9, codigo);
 
-                //double ultimoPreco = dados[^1].Close;
-                //double ultimaEMA21 = ema21[^1];
-                //double ultimaEMA9 = ema9[^1];
-                //string sinal = ultimoPreco > ultimaEMA21 ? "📈 COMPRA" :
-                //               ultimoPreco < ultimaEMA21 ? "📉 VENDA" : "🔹 NEUTRO";
-
                 // ALEM DA EMA21, USA SUPORTE E RESISTÊNCIA PARA MELHORAR O SINAL
                 double ultimoPreco = dados[^1].Close;
                 double ultimaEMA21 = ema21[^1];
@@ -926,16 +925,40 @@ namespace AnaliseAcoes
 
                 // Gera o sinal combinando EMA21 e suporte/resistência
                 string sinal;
-                if (ultimoPreco > ultimaEMA21 && pertoDoSuporte)
-                    sinal = "🟢 COMPRA (acima da EMA21 e perto do suporte)";
-                else if (ultimoPreco < ultimaEMA21 && pertoDaResistencia)
-                    sinal = "🔴 VENDA (abaixo da EMA21 e perto da resistência)";
-                else if (ultimoPreco > ultimaEMA21)
-                    sinal = "📈 TENDÊNCIA DE ALTA (acima da EMA21)";
-                else if (ultimoPreco < ultimaEMA21)
-                    sinal = "📉 TENDÊNCIA DE BAIXA (abaixo da EMA21)";
+                var rsi = CalcularRSI(dados);
+                // Faixas de RSI
+                bool rsiSobrevendido = rsi[^1] < 30;
+                bool rsiNeutro = rsi[^1] >= 30 && rsi[^1] <= 70;
+                bool rsiSobrecomprado = rsi[^1] > 70;
+
+                WFColor branco = WFColor.White;
+                WFColor laranja = WFColor.FromArgb(128, 69, 20);
+
+                if (ultimoPreco > ultimaEMA21 && pertoDoSuporte && rsiSobrevendido)
+                {
+                    sinal = "🟢 COMPRA (EMA acima, suporte próximo, RSI sobrevendido)";
+                    lblStatus.ForeColor = laranja;
+                }
+                else if (ultimoPreco < ultimaEMA21 && pertoDaResistencia && rsiSobrecomprado)
+                {
+                    sinal = "🔴 VENDA (EMA abaixo, resistência próxima, RSI sobrecomprado)";
+                    lblStatus.ForeColor = laranja;
+                }
+                else if (ultimoPreco > ultimaEMA21 && rsiNeutro)
+                {
+                    sinal = "📈 TENDÊNCIA DE ALTA (EMA acima, RSI neutro)";
+                    lblStatus.ForeColor = branco;
+                }
+                else if (ultimoPreco < ultimaEMA21 && rsiNeutro)
+                {
+                    sinal = "📉 TENDÊNCIA DE BAIXA (EMA abaixo, RSI neutro)";
+                    lblStatus.ForeColor = branco;
+                }
                 else
+                {
                     sinal = "🔹 NEUTRO (sem sinal claro)";
+                    lblStatus.ForeColor = branco;
+                }
 
                 lblStatus.Text = $"Último preço: {ultimoPreco:F2} | EMA21: {ultimaEMA21:F2} | EMA9: {ultimaEMA9:F2} → Sinal: {sinal}";
             }
@@ -967,80 +990,49 @@ namespace AnaliseAcoes
         private void ExibirGrafico(List<Cotacao> dados, List<double> ema21, List<double> ema9, string codigo)
         {
             grafico.Plot.Clear();
+            graficoRsi.Plot.Clear();
 
+            // --- DADOS ---
             double[] xs = dados.Select(d => d.Data.ToOADate()).ToArray();
             double[] ys = dados.Select(d => d.Close).ToArray();
             double[] yEma21 = ema21.ToArray();
             double[] yEma9 = ema9.ToArray();
 
-            var precoPlot = grafico.Plot.Add.Scatter(xs, ys);
-            precoPlot.Color = new ScottPlot.Color(50, 205, 50);
+            // === GRÁFICO DE PREÇO ===
+            var precoPlot = grafico.Plot.Add.Scatter(xs, ys, color: Colors.LimeGreen);
             precoPlot.LegendText = "Preço";
-
-            var ema21Plot = grafico.Plot.Add.Scatter(xs, yEma21);
-            ema21Plot.Color = new ScottPlot.Color(255, 165, 0);
+            var ema21Plot = grafico.Plot.Add.Scatter(xs, yEma21, color: Colors.Orange);
             ema21Plot.LegendText = "EMA 21";
-
-            var ema9Plot = grafico.Plot.Add.Scatter(xs, yEma9);
-            ema9Plot.Color = new ScottPlot.Color(0, 191, 255);
+            var ema9Plot = grafico.Plot.Add.Scatter(xs, yEma9, color: Colors.DeepSkyBlue);
             ema9Plot.LegendText = "EMA 9";
 
-            grafico.Plot.Axes.DateTimeTicksBottom();
-            grafico.Plot.Add.Legend();
-            grafico.Plot.Title($"Análise de {codigo}");
-
             grafico.Refresh();
-
-            // suporte e resistência
+            // Armazena os dados atuais para o hover
             var (suportes, resistencias) = CalcularSuporteResistencia(dados);
             foreach (var s in suportes)
                 grafico.Plot.Add.HorizontalLine(s, color: Colors.DarkBlue, pattern: LinePattern.Dashed);
-
             foreach (var r in resistencias)
                 grafico.Plot.Add.HorizontalLine(r, color: Colors.FireBrick, pattern: LinePattern.Dashed);
+
+            grafico.Plot.Axes.DateTimeTicksBottom();
+            grafico.Plot.Title($"Análise de {codigo}");
+            grafico.Plot.Add.Legend();
+
+            // === GRÁFICO RSI ===
+            var rsi = CalcularRSI(dados);
+            double[] ysRsi = rsi.ToArray();
+
+            graficoRsi.Plot.Add.Scatter(xs, ysRsi, color: Colors.Orange);
+            graficoRsi.Plot.Add.HorizontalLine(70, color: Colors.Red, pattern: LinePattern.Dashed);
+            graficoRsi.Plot.Add.HorizontalLine(30, color: Colors.Green, pattern: LinePattern.Dashed);
+            graficoRsi.Plot.Axes.Left.Label.Text = "RSI";
+            graficoRsi.Plot.Axes.Left.Min = 0;
+            graficoRsi.Plot.Axes.Left.Max = 100;
+            graficoRsi.Plot.Axes.DateTimeTicksBottom();
+
+            // === ATUALIZA ===
             grafico.Refresh();
-            // guarda os dados em campos para o handler acessar
-            currentXs = xs;
-            currentYs = ys;
-
-            // cria label hover se necessário (como filho do Form para ficar acima do gráfico)
-            if (lblValorHover == null)
-            {
-                lblValorHover = new WFLabel
-                {
-                    AutoSize = true,
-                    BackColor = WFColor.FromArgb(40, 40, 40),
-                    ForeColor = WFColor.White,
-                    Visible = false
-                };
-                // adiciona no Form (não dentro do grafico) para garantir que fique acima do render
-                this.Controls.Add(lblValorHover);
-                lblValorHover.BringToFront();
-            }
-
-            // remove handlers duplicados antes de adicionar (segurança)
-            grafico.MouseMove -= Grafico_MouseMove;
-            grafico.MouseLeave -= Grafico_MouseLeave;
-
-            // registra (faça isso sempre após configurar o gráfico)
-            grafico.MouseMove += Grafico_MouseMove;
-            grafico.MouseLeave += Grafico_MouseLeave;
-
-            
-
-            // grafico rsi
-            //var rsi = CalcularRSI(dados);
-            //var eixoRSI = grafico.Plot.Add.AxisY2();
-            //grafico.Plot.Add.Scatter(
-            //    xs: Enumerable.Range(0, rsi.Count).Select(i => (double)i).ToArray(),
-            //    ys: rsi.ToArray(),
-            //    color: Colors.Orange
-            //    //TitlePanel: "RSI"
-            //    );
-
-            //grafico.Plot.Add.HorizontalLine(70, color: Colors.Red, lineStyle: LineStyle.Dash);
-            //grafico.Plot.Add.HorizontalLine(30, color: Colors.Green, lineStyle: LineStyle.Dash);
-
+            graficoRsi.Refresh();
         }
         private void Grafico_MouseMove(object? sender, MouseEventArgs e)
         {
@@ -1250,7 +1242,14 @@ namespace AnaliseAcoes
 
             return rsi;
         }
-        
+        private void cmbCodigo_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                BtnBuscar_Click(btnBuscar, EventArgs.Empty);
+                e.SuppressKeyPress = true; // evita o beep do Enter
+            }
+        }
 
     }
 
